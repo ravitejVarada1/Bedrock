@@ -59,7 +59,7 @@ jobs:
             - name: 'Scan code'
               run: |
                   cd changed-sources
-                  sfdx scanner:run --format sarif --target './**/' --outfile 'results.html'  
+                  sfdx scanner:run --format sarif --target '/**/*' --outfile 'results.html'  
                   cd ..
  
             - name: Upload SARIF file
