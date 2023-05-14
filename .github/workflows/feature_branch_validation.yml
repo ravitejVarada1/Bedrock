@@ -1,0 +1,89 @@
+# Unique name for this workflow
+name: Feature Branch Validation
+
+# Workflow fires on PR
+on: [push]
+
+# Jobs to be executed
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code in the pull request
+      - name: "Checkout source code"
+        uses: actions/checkout@v2
+        with:
+          path: Bedrock
+
+      # Dynamically select token
+      - name: Set Secret Credentials
+        run: |
+          export APPEND_STRING="SFDX_AUTH_"
+          export SECRET_NAME=`echo "$APPEND_STRING$GITHUB_ACTOR" | tr -d '-' | tr [:lower:] [:upper:]`
+          echo "SECRET_NAME=$SECRET_NAME" >> $GITHUB_ENV
+
+      # Write User Token to File
+      - name: Write User Token
+        env:
+          DYNAMIC_SECRET: ${{ secrets[env.SECRET_NAME] }}
+        if: env.DYNAMIC_SECRET != null
+        run: "echo ${{ secrets[env.SECRET_NAME] }} > token.txt"
+
+      # If no user token, use default
+      - name: Write Default Token
+        env:
+          DYNAMIC_SECRET: ${{ secrets[env.SECRET_NAME] }}
+        if: env.DYNAMIC_SECRET == null
+        run: "echo ${{ secrets.SFDX_AUTH_DEFAULT }} > token.txt"
+
+      # Setup Node Actions
+      - name: Setup Node Actions
+        uses: actions/setup-node@v2
+        with:
+          node-version: "16"
+
+      # Install NPM
+      - name: Install NPM
+        run: "npm install -g latest"
+
+      # Install SF CLI
+      - name: Install Salesforce CLI
+        run: "npm install sfdx-cli --global"
+
+      # Ensure SF CLI is updated to latest version
+      - name: Update Salesforce CLI
+        run: "sfdx update"
+
+      # Auth to devhub with stored token
+      - name: Auth with DevHub
+        run: "sfdx force:auth:sfdxurl:store -f token.txt -a targetOrg -d"
+
+      # Change directory to where source is stored, push source to targetOrg
+      - name: Push source
+        run: |
+          cd Bedrock/Bedrock
+          sfdx force:source:deploy -w 360 -u targetOrg -p force-app -c
+
+      # Send success slack notification
+      - name: Slack Notification - Success
+        if: ${{ success() }}
+        uses: rtCamp/action-slack-notify@master
+        env:
+          SLACK_USERNAME: PIA Builds
+          SLACK_ICON_EMOJI: ":cargurus:"
+          SLACK_MESSAGE: Build has succeeded.
+          SLACK_TITLE: Feature Validation Complete
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+      # Send failure slack notification
+      - name: Slack Notification - Failure
+        if: ${{ failure() }}
+        uses: rtCamp/action-slack-notify@master
+        env:
+          SLACK_USERNAME: PIA Builds
+          SLACK_ICON_EMOJI: ":cargurus:"
+          SLACK_COLOR: "#FF0000"
+          SLACK_MESSAGE: Build has failed.
+          SLACK_TITLE: Feature Validation Complete
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
