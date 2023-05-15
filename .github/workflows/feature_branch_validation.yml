@@ -9,8 +9,6 @@ on:
       branches: [ main ]
       # We only care about changes to the force-app directory. This prevents the job from running
       # when changing non-salesforce files (like this yml file).
-      paths:
-        - 'Bedrock/force-app/**'
         
 # Jobs to be executed
 jobs:
