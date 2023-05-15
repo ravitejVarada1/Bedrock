@@ -57,7 +57,7 @@ public class TaskTriggerFunctions {
 
         Id ConsumerSupportCaseRecordTypeId = SObjectDescribeUtils.getRecordTypeIdByDevName('Case', 'Consumer_Support');
         
-        //Loop through tasks to populate the three collections above
+        //Loop through tasks to ddddpopulate the three collections above
         for (Task t : newTasks) {
 
             String whatId = t.whatId;
