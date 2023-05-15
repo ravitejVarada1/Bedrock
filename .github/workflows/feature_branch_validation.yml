@@ -1,11 +1,17 @@
 # Unique name for this workflow
 name: Validate PR on integration branch
 
-# Definition when the workflow should run
-on: [push]
-
-            
-
+on:
+    pull_request:
+      # This workflow will run when a pull request is opened, or when a commit is pushed
+      # to a branch that has an existing pull request
+      types: [opened, synchronize]
+      branches: [ main ]
+      # We only care about changes to the force-app directory. This prevents the job from running
+      # when changing non-salesforce files (like this yml file).
+      paths:
+        - 'Bedrock/force-app/**'
+        
 # Jobs to be executed
 jobs:
     validate-deployment-on-integration-org:
@@ -22,7 +28,8 @@ jobs:
               uses: actions/checkout@v2
               with:
                 fetch-depth: 0
-                  
+
+      
             # Install Salesforce CLI
             - name: 'Install Salesforce CLI'
               run: |
@@ -46,15 +53,23 @@ jobs:
             - name: 'Installing SFDX scanner'
               run: sfdx plugins:install @salesforce/sfdx-scanner
 
-         
-     
+
+            # We use SFDX Git Delta to create a directory with only the metadata that has changed, this allows us
+            # to deploy only those changes, as opposed to deploying the entire branch. This helps reducing deployment times
+            - name: 'Create delta packages for new, modified or deleted metadata'
+              run: | 
+                  mkdir changed-sources
+                  sfdx sgd:source:delta --to "HEAD" --from "HEAD^" --output changed-sources/ --generate-delta --source force-app/ 
+
             # Scan the code in the delta directory by using sfdx scanner. Output the results of the scan in a new file
             # called apexScanResults.sarif
             - name: 'Scan code'
               run: |
+                  cd changed-sources
                   sfdx scanner:run --format sarif --target './**/' --outfile 'results.html'  
+                  cd ..
  
             - name: Upload SARIF file
               uses: github/codeql-action/upload-sarif@v2
               with:
-                sarif_file: results.html
+                sarif_file: changed-sources/results.html
